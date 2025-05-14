@@ -6,63 +6,95 @@ from common.functions import sigmoid
 
 class RNN:
     def __init__(self, Wx, Wh, b):
-        self.params = [Wx, Wh, b]
-        self.grads = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
-        self.cache = None
+        # 파라미터 초기화
+        self.params = [Wx, Wh, b]  # Wx: 입력 가중치, Wh: 은닉 상태 가중치, b: 편향
+        self.grads = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]  # 기울기 초기화
+        self.cache = None  # 순전파 계산 결과 저장
 
     def forward(self, x, h_prev):
-        Wx, Wh, b = self.params
-        t = np.dot(h_prev, Wh) + np.dot(x, Wx) + b
-        h_next = np.tanh(t)
+        """
+        순방향 전파를 수행합니다.
 
-        self.cache = (x, h_prev, h_next)
-        return h_next
+        Args:
+            x: 현재 시점의 입력 (N, D) - N: 배치 크기, D: 입력 차원
+            h_prev: 이전 시점의 은닉 상태 (N, H) - H: 은닉 상태 차원
+
+        Returns:
+            h_next: 현재 시점의 은닉 상태 (N, H)
+        """
+        Wx, Wh, b = self.params  # 가중치와 편향
+        t = np.dot(h_prev, Wh) + np.dot(x, Wx) + b  # Affine 변환 계산
+        h_next = np.tanh(t)  # 활성화 함수 (tanh) 적용
+
+        self.cache = (x, h_prev, h_next)  # 역전파 계산을 위해 값 저장
+        return h_next  # 현재 시점의 은닉 상태 반환
 
     def backward(self, dh_next):
-        Wx, Wh, b = self.params
-        x, h_prev, h_next = self.cache
+        """
+        역방향 전파를 수행합니다.
 
-        dt = dh_next * (1 - h_next ** 2)
-        db = np.sum(dt, axis=0)
-        dWh = np.dot(h_prev.T, dt)
-        dh_prev = np.dot(dt, Wh.T)
-        dWx = np.dot(x.T, dt)
-        dx = np.dot(dt, Wx.T)
+        Args:
+            dh_next: 현재 시점의 은닉 상태에 대한 기울기 (N, H)
 
-        self.grads[0][...] = dWx
+        Returns:
+            dx: 현재 시점의 입력에 대한 기울기 (N, D)
+            dh_prev: 이전 시점의 은닉 상태에 대한 기울기 (N, H)
+        """
+        Wx, Wh, b = self.params  # 가중치와 편향
+        x, h_prev, h_next = self.cache  # 순전파 계산 결과
+
+        dt = dh_next * (1 - h_next ** 2)  # tanh의 미분
+        db = np.sum(dt, axis=0)  # 편향에 대한 기울기
+        dWh = np.dot(h_prev.T, dt)  # 은닉 상태 가중치에 대한 기울기
+        dh_prev = np.dot(dt, Wh.T)  # 이전 시점의 은닉 상태에 대한 기울기
+        dWx = np.dot(x.T, dt)  # 입력 가중치에 대한 기울기
+        dx = np.dot(dt, Wx.T)  # 현재 시점의 입력에 대한 기울기
+
+        self.grads[0][...] = dWx  # 가중치 기울기 저장
         self.grads[1][...] = dWh
         self.grads[2][...] = db
 
-        return dx, dh_prev
-
+        return dx, dh_prev  # 입력과 이전 은닉 상태에 대한 기울기 반환
 
 class TimeRNN:
     def __init__(self, Wx, Wh, b, stateful=False):
-        self.params = [Wx, Wh, b]
-        self.grads = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]
-        self.layers = None
+        # 파라미터 초기화
+        self.params = [Wx, Wh, b]  # Wx: 입력 가중치, Wh: 은닉 상태 가중치, b: 편향
+        self.grads = [np.zeros_like(Wx), np.zeros_like(Wh), np.zeros_like(b)]  # 기울기 초기화
+        self.layers = None  # RNN 레이어들을 저장할 리스트
 
-        self.h, self.dh = None, None
-        self.stateful = stateful
+        self.h, self.dh = None, None  # 은닉 상태와 은닉 상태 기울기
+        self.stateful = stateful  # 은닉 상태 유지 여부
 
     def forward(self, xs):
-        Wx, _, _ = self.params
-        N, T, _ = xs.shape
-        _, H = Wx.shape
+        """
+        순방향 전파를 수행합니다.
 
-        self.layers = []
-        hs = np.empty((N, T, H), dtype='f')
+        Args:
+            xs: 입력 시퀀스 (N, T, D) - N: 배치 크기, T: 시퀀스 길이, D: 입력 차원
 
+        Returns:
+            hs: 은닉 상태 시퀀스 (N, T, H) - H: 은닉 상태 차원
+        """
+        Wx, _, _ = self.params  # 입력 가중치
+        N, T, _ = xs.shape  # 입력 시퀀스의 형태
+        _, H = Wx.shape  # 은닉 상태 차원
+
+        self.layers = []  # RNN 레이어들을 저장할 리스트
+        hs = np.empty((N, T, H), dtype='f')  # 은닉 상태 시퀀스를 저장할 배열
+
+        # stateful이 False이거나 이전 은닉 상태가 없으면 0으로 초기화
         if not self.stateful or self.h is None:
             self.h = np.zeros((N, H), dtype='f')
 
+        # 각 시점에 대해 RNN 레이어를 적용
         for t in range(T):
-            layer = RNN(*self.params)
-            self.h = layer.forward(xs[:, t, :], self.h)
-            hs[:, t, :] = self.h
-            self.layers.append(layer)
+            layer = RNN(*self.params)  # RNN 레이어 생성
+            self.h = layer.forward(xs[:, t, :], self.h)  # 현재 시점의 입력과 이전 은닉 상태를 사용하여 순방향 전파 수행
+            hs[:, t, :] = self.h  # 현재 시점의 은닉 상태를 저장
+            self.layers.append(layer)  # RNN 레이어를 리스트에 추가
 
-        return hs
+        return hs  # 은닉 상태 시퀀스 반환
 
     def backward(self, dhs):
         Wx, Wh, b = self.params
