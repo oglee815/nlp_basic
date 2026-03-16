@@ -9,3 +9,4 @@
 - [생성 모델 학습](https://colab.research.google.com/github/oglee815/nlp_basic/blob/main/생성형_언어_모델_학습.ipynb)
 - (참고)[rnn+attention 실습](https://colab.research.google.com/github/oglee815/nlp_basic/blob/main/rnn_with_attention.ipynb)
 - (참고)[transformer 알아보기](https://colab.research.google.com/github/oglee815/nlp_basic/blob/main/annotated_transformer.ipynb)
+- (참고)[안드레 카파시의 minGPT 코드](https://github.com/karpathy/minGPT/tree/master)
